@@ -19,7 +19,6 @@ void Philosopher::Eat() {
 
 // Acquire left_fork_ and right_fork_
 void Philosopher::AcquireForks() {
-  // Your code goes here
   if (seat_ % 2 == 0) {
     left_fork_.lock();
     right_fork_.lock();
