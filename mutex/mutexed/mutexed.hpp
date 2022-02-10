@@ -27,7 +27,10 @@ class Mutexed {
     UniqueRef(UniqueRef&&) = delete;
 
     // operator*
-    std::add_lvalue_reference_t<T> operator*() const {
+
+    template <typename Tt = T>
+    std::enable_if_t<std::is_fundamental_v<Tt>, std::add_lvalue_reference_t<Tt>>
+    operator*() const {
       return object_;
     }
 
