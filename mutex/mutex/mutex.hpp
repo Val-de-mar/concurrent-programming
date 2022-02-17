@@ -19,8 +19,10 @@ class Mutex {
   }
 
   void Unlock() {
-    free_ticket_.fetch_add(1);
-    free_ticket_.FutexWakeAll();
+    uint32_t free = free_ticket_.fetch_add(1);
+    if (free + 1 != last_waiting_.load()) {
+      free_ticket_.FutexWakeAll();
+    }
   }
 
  private:
