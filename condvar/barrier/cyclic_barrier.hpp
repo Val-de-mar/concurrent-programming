@@ -51,28 +51,26 @@ class CyclicBarrier {
       }
       --waiting_;
     }*/
-    { std::lock_guard<Mutex> enter(enter_); }
+
     std::unique_lock<Mutex> lock(mutex_);
-    ready_to_go_ = false;
+    while (ready_to_go_) {
+      locker_.wait(lock);
+    }
+
     ++waiting_;
     if (waiting_ == participants_num_) {
-      lock.unlock();
-      std::lock_guard<Mutex> enter(enter_);
-      lock.lock();
       ready_to_go_ = true;
-      while (waiting_ != 1) {
-        locker_.notify_one();
-        lock.unlock();
-        lock.lock();
-      }
+      locker_.notify_all();
       --waiting_;
-      return;
     } else {
       while (!ready_to_go_) {
         locker_.wait(lock);
       }
       --waiting_;
-      return;
+    }
+    if (waiting_ == 0) {
+      locker_.notify_all();
+      ready_to_go_ = false;
     }
   }
 
@@ -80,6 +78,7 @@ class CyclicBarrier {
   CondVar locker_;
   Mutex mutex_;
   Mutex enter_;
+  Mutex checker_;
   size_t participants_num_;
   size_t waiting_;
   bool ready_to_go_;
