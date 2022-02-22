@@ -2,6 +2,7 @@
 
 #include <twist/stdlike/mutex.hpp>
 #include <twist/stdlike/condition_variable.hpp>
+#include "iostream"
 
 // std::lock_guard, std::unique_lock
 #include <mutex>
@@ -27,6 +28,8 @@ class CyclicBarrier {
 
   // Blocks until all participants have invoked Arrive()
   void Arrive() {
+    /*
+    { std::lock_guard enter(enter_); }
     std::unique_lock lock(mutex_);
     ready_to_go_ = false;
     ++waiting_;
@@ -47,9 +50,30 @@ class CyclicBarrier {
         locker_.wait(lock);
       }
       --waiting_;
+    }*/
+    { std::lock_guard<Mutex> enter(enter_); }
+    std::unique_lock<Mutex> lock(mutex_);
+    ready_to_go_ = false;
+    ++waiting_;
+    if (waiting_ == participants_num_) {
       lock.unlock();
+      std::lock_guard<Mutex> enter(enter_);
+      lock.lock();
+      ready_to_go_ = true;
+      while (waiting_ != 1) {
+        locker_.notify_one();
+        lock.unlock();
+        lock.lock();
+      }
+      --waiting_;
+      return;
+    } else {
+      while (!ready_to_go_) {
+        locker_.wait(lock);
+      }
+      --waiting_;
+      return;
     }
-    { std::lock_guard enter(enter_); }
   }
 
  private:
