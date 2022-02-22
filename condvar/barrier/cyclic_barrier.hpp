@@ -27,7 +27,6 @@ class CyclicBarrier {
 
   // Blocks until all participants have invoked Arrive()
   void Arrive() {
-    { std::lock_guard enter(enter_); }
     std::unique_lock lock(mutex_);
     ready_to_go_ = false;
     ++waiting_;
@@ -48,7 +47,9 @@ class CyclicBarrier {
         locker_.wait(lock);
       }
       --waiting_;
+      lock.unlock();
     }
+    { std::lock_guard enter(enter_); }
   }
 
  private:
