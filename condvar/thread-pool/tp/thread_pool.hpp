@@ -9,6 +9,8 @@
 
 #include <tp/zero_waiter.hpp>
 
+#include <vector>
+
 namespace tp {
 
 // Fixed-size pool of worker threads

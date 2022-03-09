@@ -10,19 +10,20 @@ namespace tp {
 
 // Unbounded blocking multi-producers/multi-consumers queue
 
+template <class Q>
+struct PopFrontWhenDie {
+  Q& object_;
+  explicit PopFrontWhenDie(Q& object) : object_(object) {
+  }
+  ~PopFrontWhenDie() {
+    object_.pop_front();
+  }
+};
+
 template <typename T>
 class UnboundedBlockingQueue {
   using Mutex = twist::stdlike::mutex;
   using CondVar = twist::stdlike::condition_variable;
-  template <class Q>
-  struct PopWhenDie {
-    Q& object_;
-    explicit PopWhenDie(Q& object) : object_(object) {
-    }
-    ~PopWhenDie() {
-      object_.pop();
-    }
-  };
 
  public:
   bool Put(T value) {
@@ -30,7 +31,7 @@ class UnboundedBlockingQueue {
     if (closed_) {
       return false;
     }
-    queue_.push(std::move(value));
+    queue_.push_back(std::move(value));
     queue_access_.notify_one();
     return true;
   }
@@ -43,7 +44,7 @@ class UnboundedBlockingQueue {
     if (closed_ && queue_.empty()) {
       return std::nullopt;
     }
-    PopWhenDie pop(queue_);
+    PopFrontWhenDie pop(queue_);
     return {std::move(queue_.front())};
   }
 
