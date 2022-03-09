@@ -5,26 +5,15 @@
 
 #include <twist/stdlike/thread.hpp>
 #include <twist/stdlike/atomic.hpp>
-#include <twist/stdlike/atomic.hpp>
 #include <twist/util/thread_local.hpp>
+
+#include <tp/zero_waiter.hpp>
 
 namespace tp {
 
 // Fixed-size pool of worker threads
 
 class ThreadPool {
-  class NullWaiter {
-   public:
-    NullWaiter& operator--();
-    NullWaiter& operator++();
-    void Wait();
-
-   private:
-    uint32_t counter_ = 0;
-    twist::stdlike::mutex mutex_;
-    twist::stdlike::condition_variable is_null_;
-  };
-
  public:
   explicit ThreadPool(size_t workers);
   ~ThreadPool();
@@ -47,10 +36,13 @@ class ThreadPool {
   static ThreadPool* Current();
 
  private:
-  NullWaiter waiter_;
+  void ThreadRoutine();
+
+ private:
+  ZeroWaiter waiter_;
   std::vector<twist::stdlike::thread> workers_;
   UnboundedBlockingQueue<Task> tasks_;
-  twist::stdlike::atomic<bool> is_stopped_{false};
+  bool is_stopped_{false};
 };
 
 inline ThreadPool* Current() {

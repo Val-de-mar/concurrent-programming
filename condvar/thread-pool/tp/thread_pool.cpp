@@ -13,27 +13,14 @@ static twist::util::ThreadLocalPtr<ThreadPool> this_pool;
 ThreadPool::ThreadPool(size_t workers) {
   workers_.reserve(workers);
   for (size_t i = 0; i < workers; ++i) {
-    workers_.emplace_back([pool = this]() {
-      tp::this_pool = pool;
-      while (true) {
-        auto task = pool->tasks_.Take();
-        if (task) {
-          try {
-            task.value()();
-          } catch (...) {
-          }
-          --(pool->waiter_);
-        } else {
-          return;
-        }
-      }
-      tp::this_pool = nullptr;
+    workers_.emplace_back([this]() {
+      ThreadRoutine();
     });
   }
 }
 
 ThreadPool::~ThreadPool() {
-  assert(is_stopped_.load());
+  assert(is_stopped_);
 }
 
 void ThreadPool::Submit(Task task) {
@@ -49,7 +36,7 @@ void ThreadPool::WaitIdle() {
 
 void ThreadPool::Stop() {
   tasks_.Cancel();
-  is_stopped_.store(true);
+  is_stopped_ = true;
   for (auto& worker : workers_) {
     worker.join();
   }
@@ -59,24 +46,16 @@ ThreadPool* ThreadPool::Current() {
   return this_pool;
 }
 
-ThreadPool::NullWaiter& ThreadPool::NullWaiter::operator--() {
-  std::unique_lock lock(mutex_);
-  assert(counter_ != 0);
-  --counter_;
-  if (counter_ == 0) {
-    is_null_.notify_all();
+void ThreadPool::ThreadRoutine() {
+  tp::this_pool = this;
+  while (auto task = tasks_.Take()) {
+    try {
+      task.value()();
+    } catch (...) {
+    }
+    --(waiter_);
   }
-  return *this;
+  tp::this_pool = nullptr;
 }
-ThreadPool::NullWaiter& ThreadPool::NullWaiter::operator++() {
-  std::unique_lock lock(mutex_);
-  ++counter_;
-  return *this;
-}
-void ThreadPool::NullWaiter::Wait() {
-  std::unique_lock lock(mutex_);
-  if (counter_ != 0) {
-    is_null_.wait(lock);
-  }
-}
+
 }  // namespace tp
