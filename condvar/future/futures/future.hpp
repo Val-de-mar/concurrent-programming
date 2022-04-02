@@ -78,7 +78,7 @@ class Future {
   }
 
  private:
-  Future(std::shared_ptr<detail::FutureControlBlock<T>> connection)
+  explicit Future(std::shared_ptr<detail::FutureControlBlock<T>> connection)
       : connection_(std::move(connection)) {
   }
 
