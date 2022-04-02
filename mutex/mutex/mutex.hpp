@@ -10,24 +10,18 @@ namespace stdlike {
 class Mutex {
  public:
   void Lock() {
-    uint32_t ticket = last_waiting_.fetch_add(1);
-    uint32_t prev = free_ticket_.load();
-    while (ticket != prev) {
-      free_ticket_.FutexWait(prev);
-      prev = free_ticket_.load();
+    while (access_.exchange(1)) {
+      access_.FutexWait(1);
     }
   }
 
   void Unlock() {
-    uint32_t free = free_ticket_.fetch_add(1);
-    if (free + 1 != last_waiting_.load()) {
-      free_ticket_.FutexWakeAll();
-    }
+    access_.store(0);
+    access_.notify_one();
   }
 
  private:
-  twist::stdlike::atomic<uint32_t> last_waiting_{0};
-  twist::stdlike::atomic<uint32_t> free_ticket_{0};
+  twist::stdlike::atomic<uint32_t> access_{0};
 };
 
 }  // namespace stdlike
