@@ -10,10 +10,7 @@ namespace stdlike {
 template <typename T>
 class Promise {
  public:
-  Promise()
-      : is_ready_(std::make_shared<detail::Blocker>()),
-        message_(
-            std::make_shared<std::shared_ptr<typename Future<T>::Message>>()) {
+  Promise() : connection_(std::make_shared<detail::FutureControlBlock<T>>()) {
   }
 
   // Non-copyable
@@ -26,26 +23,25 @@ class Promise {
 
   // One-shot
   Future<T> MakeFuture() {
-    return Future<T>(is_ready_, message_);
+    return Future<T>(connection_);
   }
 
   // One-shot
   // Fulfill promise with value
   void SetValue(T value) {
-    *message_ = std::make_shared<typename Future<T>::Message>(std::move(value));
-    is_ready_->Open();
+    connection_->message_ = std::move(value);
+    connection_->is_ready_.Open();
   }
 
   // One-shot
   // Fulfill promise with exception
   void SetException(std::exception_ptr ex) {
-    *message_ = std::make_shared<typename Future<T>::Message>(std::move(ex));
-    is_ready_->Open();
+    connection_->message_ = detail::ExceptionIsolator{std::move(ex)};
+    connection_->is_ready_.Open();
   }
 
  private:
-  std::shared_ptr<detail::Blocker> is_ready_;
-  std::shared_ptr<std::shared_ptr<typename Future<T>::Message>> message_;
+  std::shared_ptr<detail::FutureControlBlock<T>> connection_;
 };
 
 }  // namespace stdlike

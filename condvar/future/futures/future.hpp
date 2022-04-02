@@ -3,6 +3,8 @@
 #include <twist/stdlike/mutex.hpp>
 #include <twist/stdlike/condition_variable.hpp>
 
+#include <wheels/support/compiler.hpp>
+
 #include <memory>
 #include <cassert>
 #include <variant>
@@ -32,6 +34,16 @@ class Blocker {
   CondVar cond_var_;
   bool closed_ = true;
 };
+
+struct ExceptionIsolator {
+  std::exception_ptr exception_;
+};
+
+template <typename T>
+struct FutureControlBlock {
+  Blocker is_ready_;
+  std::variant<T, ExceptionIsolator> message_ = ExceptionIsolator{nullptr};
+};
 }  // namespace detail
 
 template <typename T>
@@ -43,15 +55,13 @@ class Future {
     T operator()(T& a) {
       return std::move(a);
     }
-    T operator()(std::exception_ptr& ex) {
-      std::rethrow_exception(ex);
-      assert(false);
-      return std::move(*((T*)this));  // unreachable
+    T operator()(detail::ExceptionIsolator& ex) {
+      std::rethrow_exception(ex.exception_);
+      WHEELS_UNREACHABLE();
     }
   };
 
  public:
-  using Message = std::variant<T, std::exception_ptr>;
   // Non-copyable
   Future(const Future&) = delete;
   Future& operator=(const Future&) = delete;
@@ -63,19 +73,17 @@ class Future {
   // One-shot
   // Wait for result (value or exception)
   T Get() {
-    is_written_->Check();
-    return std::visit(Visitor(), **message_);
+    connection_->is_ready_.Check();
+    return std::visit(Visitor(), connection_->message_);
   }
 
  private:
-  Future(std::shared_ptr<detail::Blocker> blocker,
-         std::shared_ptr<std::shared_ptr<Message>> message)
-      : is_written_(std::move(blocker)), message_(std::move(message)) {
+  Future(std::shared_ptr<detail::FutureControlBlock<T>> connection)
+      : connection_(std::move(connection)) {
   }
 
  private:
-  std::shared_ptr<detail::Blocker> is_written_;
-  std::shared_ptr<std::shared_ptr<Message>> message_;
+  std::shared_ptr<detail::FutureControlBlock<T>> connection_;
 };
 
 }  // namespace stdlike
