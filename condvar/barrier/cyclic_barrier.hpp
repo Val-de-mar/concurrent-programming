@@ -23,65 +23,39 @@ class CyclicBarrier {
   using CondVar = twist::stdlike::condition_variable;
 
   explicit CyclicBarrier(size_t participants)
-      : participants_num_(participants), waiting_(0), ready_to_go_(false) {
+      : participants_num_(participants), waiting_(0), first_filter_(false) {
   }
 
   // Blocks until all participants have invoked Arrive()
   void Arrive() {
-    /*
-    { std::lock_guard enter(enter_); }
-    std::unique_lock lock(mutex_);
-    ready_to_go_ = false;
-    ++waiting_;
-    if (participants_num_ == waiting_) {
-      lock.unlock();
-      std::lock_guard enter(enter_);
-      ready_to_go_ = true;
-      lock.lock();
-      while (waiting_ != 1) {
-        lock.unlock();
-        locker_.notify_all();
-        lock.lock();
-      }
-      lock.unlock();
-      --waiting_;
-    } else {
-      while (!ready_to_go_) {
-        locker_.wait(lock);
-      }
-      --waiting_;
-    }*/
-
     std::unique_lock<Mutex> lock(mutex_);
-    while (ready_to_go_) {
+    while (first_filter_) {
       locker_.wait(lock);
     }
 
     ++waiting_;
     if (waiting_ == participants_num_) {
-      ready_to_go_ = true;
+      first_filter_ = true;
       locker_.notify_all();
       --waiting_;
     } else {
-      while (!ready_to_go_) {
+      while (!first_filter_) {
         locker_.wait(lock);
       }
       --waiting_;
     }
     if (waiting_ == 0) {
       locker_.notify_all();
-      ready_to_go_ = false;
+      first_filter_ = false;
     }
   }
 
  private:
   CondVar locker_;
   Mutex mutex_;
-  Mutex enter_;
-  Mutex checker_;
   size_t participants_num_;
   size_t waiting_;
-  bool ready_to_go_;
+  bool first_filter_;
 };
 
 }  // namespace solutions
