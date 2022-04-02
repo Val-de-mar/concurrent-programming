@@ -10,7 +10,7 @@ namespace stdlike {
 class Mutex {
  public:
   void Lock() {
-    while (access_.exchange(1)) {
+    while (access_.exchange(1) != 0u) {
       access_.FutexWait(1);
     }
   }
