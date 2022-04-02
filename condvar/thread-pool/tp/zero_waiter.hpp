@@ -4,7 +4,6 @@
 
 #pragma once
 
-#include <twist/stdlike/thread.hpp>
 #include <twist/stdlike/mutex.hpp>
 #include <twist/stdlike/condition_variable.hpp>
 

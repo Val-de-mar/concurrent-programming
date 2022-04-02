@@ -2,24 +2,15 @@
 
 #include <twist/stdlike/mutex.hpp>
 #include <twist/stdlike/condition_variable.hpp>
-#include <deque>
 
+#include <wheels/support/defer.hpp>
+
+#include <deque>
 #include <optional>
 
 namespace tp {
 
 // Unbounded blocking multi-producers/multi-consumers queue
-
-template <class Q>
-struct PopFrontWhenDie {
-  Q& object_;
-  explicit PopFrontWhenDie(Q& object) : object_(object) {
-  }
-  ~PopFrontWhenDie() {
-    object_.pop_front();
-  }
-};
-
 template <typename T>
 class UnboundedBlockingQueue {
   using Mutex = twist::stdlike::mutex;
@@ -44,7 +35,9 @@ class UnboundedBlockingQueue {
     if (closed_ && queue_.empty()) {
       return std::nullopt;
     }
-    PopFrontWhenDie pop(queue_);
+    wheels::Defer popper([this]() {
+      queue_.pop_front();
+    });
     return {std::move(queue_.front())};
   }
 
