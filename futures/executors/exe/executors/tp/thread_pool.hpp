@@ -4,6 +4,8 @@
 #include <exe/executors/tp/zero_waiter.hpp>
 #include <exe/executors/tp/blocking_queue.hpp>
 
+#include <vector>
+
 namespace exe::executors {
 
 // Fixed-size pool of worker threads
