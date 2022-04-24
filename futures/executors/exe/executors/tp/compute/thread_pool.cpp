@@ -1,8 +1,8 @@
-#include <exe/executors/tp/thread_pool.hpp>
+#include <exe/executors/tp/compute/thread_pool.hpp>
 
 #include <twist/util/thread_local.hpp>
 
-namespace exe::executors {
+namespace exe::executors::tp::compute {
 
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -20,6 +20,7 @@ ThreadPool::ThreadPool(size_t workers) {
 }
 
 ThreadPool::~ThreadPool() {
+  std::cout << "here\n";
   //  assert(is_stopped_);
 }
 
@@ -58,4 +59,4 @@ void ThreadPool::ThreadRoutine() {
   pool = nullptr;
 }
 
-}  // namespace exe::executors
+}  // namespace exe::executors::tp::compute

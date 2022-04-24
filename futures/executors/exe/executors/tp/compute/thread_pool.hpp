@@ -6,7 +6,7 @@
 
 #include <vector>
 
-namespace exe::executors {
+namespace exe::executors::tp::compute {
 
 // Fixed-size pool of worker threads
 
@@ -43,4 +43,4 @@ class ThreadPool : public IExecutor {
   bool is_stopped_{false};
 };
 
-}  // namespace exe::executors
+}  // namespace exe::executors::tp::compute
