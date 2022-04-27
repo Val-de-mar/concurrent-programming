@@ -21,6 +21,7 @@ void Strand::Execute(Task task) {
 void Strand::Schedule() {
   slave_.Execute([this]() {
     auto stolen = tasks_.exchange(nullptr);
+
     if (stolen == nullptr) {
       reschedule_.store(true);
       if (tasks_.load() == nullptr) {
@@ -38,18 +39,6 @@ void Strand::Schedule() {
       auto save = stolen->prev_.load();
       delete stolen;
       stolen = save;
-    }
-
-    if (tasks_.load() == nullptr) {
-      reschedule_.store(true);
-      if (tasks_.load() == nullptr) {
-        return;
-      }
-      if (!reschedule_.exchange(false)) {
-        return;
-      }
-      Schedule();
-      return;
     }
     Schedule();
   });

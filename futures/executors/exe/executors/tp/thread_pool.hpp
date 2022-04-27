@@ -1,10 +1,6 @@
 #pragma once
 
 #include <exe/executors/executor.hpp>
-#include <exe/executors/tp/zero_waiter.hpp>
-#include <exe/executors/tp/blocking_queue.hpp>
-
-#include <vector>
 
 namespace exe::executors {
 
@@ -34,13 +30,7 @@ class ThreadPool : public IExecutor {
   static ThreadPool* Current();
 
  private:
-  void ThreadRoutine();
-
- private:
-  exe::detail::ZeroWaiter waiter_;
-  std::vector<twist::stdlike::thread> workers_;
-  exe::detail::UnboundedBlockingQueue<Task> tasks_;
-  bool is_stopped_{false};
+  // Worker threads, task queue, etc
 };
 
 }  // namespace exe::executors

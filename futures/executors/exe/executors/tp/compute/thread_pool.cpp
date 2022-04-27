@@ -20,8 +20,7 @@ ThreadPool::ThreadPool(size_t workers) {
 }
 
 ThreadPool::~ThreadPool() {
-  std::cout << "here\n";
-  //  assert(is_stopped_);
+  assert(is_stopped_);
 }
 
 void ThreadPool::Execute(Task task) {

@@ -8,7 +8,8 @@
 
 namespace exe::executors::tp::compute {
 
-// Fixed-size pool of worker threads
+// Thread pool for independent CPU-bound tasks
+// Fixed pool of worker threads + shared unbounded blocking queue
 
 class ThreadPool : public IExecutor {
  public:
@@ -21,7 +22,7 @@ class ThreadPool : public IExecutor {
 
   // IExecutor
   // Schedules task for execution in one of the worker threads
-  void Execute(Task task);
+  void Execute(Task task) override;
 
   // Waits until outstanding work count has reached zero
   void WaitIdle();
