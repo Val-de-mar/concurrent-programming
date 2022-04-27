@@ -5,41 +5,39 @@
 
 #include <optional>
 
-namespace exe::coroutine::processors {
+namespace exe::coroutine::generators {
 
 template <typename T>
-class Processor {
+class Generator {
  public:
-  explicit Processor(Routine /*routine*/) {
+  explicit Generator(Routine /*routine*/) {
     // Not implemented
   }
 
-  void Send(T /*value*/) {
-    // Not implemented
+  // Pull
+  std::optional<T> Receive() {
+    return std::nullopt;  // Not implemented
   }
 
-  void Close() {
+  static void Send(T /*value*/) {
     // Not implemented
-  }
-
-  static std::optional<T> Receive() {
-    return std::nullopt;
   }
 
  private:
+  // Intentionally naive and inefficient
   static context::Stack AllocateStack() {
     static const size_t kStackPages = 16;  // 16 * 4KB = 64KB
     return context::Stack::AllocatePages(kStackPages);
   }
 
  private:
-  // ???
+  /// ???
 };
 
 // Shortcut
 template <typename T>
-std::optional<T> Receive() {
-  return Processor<T>::Receive();
+void Send(T value) {
+  Generator<T>::Send(std::move(value));
 }
 
-}  // namespace exe::coroutine::processors
+}  // namespace exe::coroutine::generators

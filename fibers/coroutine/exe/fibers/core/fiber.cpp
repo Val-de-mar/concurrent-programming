@@ -9,17 +9,12 @@ static twist::strand::ThreadLocalPtr<Fiber> current_fiber;
 
 //////////////////////////////////////////////////////////////////////
 
+void Fiber::FiberRunner::operator()() {
+  owner_->Step();
+}
+
 void Fiber::Schedule() {
-  scheduler_.Submit([this]() {
-    exe::fibers::current_fiber = this;
-    Step();
-    if (!coroutine_.IsCompleted()) {
-      Schedule();
-    } else {
-      delete this;
-    }
-    exe::fibers::current_fiber = nullptr;
-  });
+  scheduler_.Submit(tp::Task(static_cast<tp::TaskBlock*>(&runner_)));
 }
 
 void Fiber::Yield() {
@@ -27,7 +22,14 @@ void Fiber::Yield() {
 }
 
 void Fiber::Step() {
+  exe::fibers::current_fiber = this;
   coroutine_.Resume();
+  if (!coroutine_.IsCompleted()) {
+    Schedule();
+  } else {
+    delete this;
+  }
+  exe::fibers::current_fiber = nullptr;
 }
 
 Fiber& Fiber::Self() {
@@ -37,7 +39,8 @@ Fiber& Fiber::Self() {
 Fiber::Fiber(Scheduler& scheduler, Routine routine)
     : scheduler_(scheduler),
       stack_(AllocateStack()),
-      coroutine_(std::move(routine), stack_.View()) {
+      coroutine_(std::move(routine), stack_.View()),
+      runner_(this) {
 }
 
 Fiber::~Fiber() {

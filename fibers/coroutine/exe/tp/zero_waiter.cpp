@@ -1,7 +1,3 @@
-//
-// Created by val-de-mar on 09.03.2022.
-//
-
 #include <exe/tp/zero_waiter.hpp>
 
 #include <cassert>
@@ -24,7 +20,7 @@ ZeroWaiter& ZeroWaiter::operator++() {
 }
 void ZeroWaiter::Wait() {
   std::unique_lock lock(mutex_);
-  if (counter_ != 0) {
+  while (counter_ != 0) {
     is_null_.wait(lock);
   }
 }

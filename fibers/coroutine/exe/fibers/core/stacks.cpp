@@ -25,9 +25,6 @@ class StackAllocator {
   }
 
   void Release(Stack stack) {
-    if (stack.Size() == 0) {
-      return;
-    }
     std::lock_guard lock(mutex_);
     freed_.push_back(std::move(stack));
   }
