@@ -36,7 +36,6 @@ class WorkStealingQueue {
       }
 
       T* ans = buffer_[begin % Capacity].item.load(std::memory_order_relaxed);
-
       if (begin_.compare_exchange_weak(begin, begin + 1,
                                        std::memory_order_acq_rel)) {
         return ans;
