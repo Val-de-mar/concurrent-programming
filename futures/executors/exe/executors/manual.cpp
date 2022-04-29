@@ -11,7 +11,8 @@ void ManualExecutor::Execute(Task task) {
 size_t ManualExecutor::RunAtMost(size_t limit) {
   size_t completed = 0;
   for (; completed < limit && HasTasks(); ++completed) {
-    tasks_.front()();
+    tasks_.front()->Run();
+    tasks_.front()->Discard();
     tasks_.pop();
   }
   return completed;
@@ -20,7 +21,8 @@ size_t ManualExecutor::RunAtMost(size_t limit) {
 size_t ManualExecutor::Drain() {
   size_t completed = 0;
   while (HasTasks()) {
-    tasks_.front()();
+    tasks_.front()->Run();
+    tasks_.front()->Discard();
     tasks_.pop();
     ++completed;
   }
@@ -28,4 +30,3 @@ size_t ManualExecutor::Drain() {
 }
 
 }  // namespace exe::executors
-   // namespace exe::executors

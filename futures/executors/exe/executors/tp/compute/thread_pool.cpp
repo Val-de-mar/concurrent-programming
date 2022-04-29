@@ -25,7 +25,7 @@ ThreadPool::~ThreadPool() {
 
 void ThreadPool::Execute(Task task) {
   waiter_.IncrementValue();
-  if (!tasks_.Put(std::move(task))) {
+  if (!tasks_.Put(task)) {
     waiter_.DecrementValue();
   }
 }
@@ -35,7 +35,9 @@ void ThreadPool::WaitIdle() {
 }
 
 void ThreadPool::Stop() {
-  tasks_.Cancel();
+  tasks_.Cancel([](Task task) {
+    task->Discard();
+  });
   is_stopped_ = true;
   for (auto& worker : workers_) {
     worker.join();
@@ -50,9 +52,10 @@ void ThreadPool::ThreadRoutine() {
   pool = this;
   while (auto task = tasks_.Take()) {
     try {
-      task.value()();
+      task.value()->Run();
     } catch (...) {
     }
+    task.value()->Discard();
     waiter_.DecrementValue();
   }
   pool = nullptr;

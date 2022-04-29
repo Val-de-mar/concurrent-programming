@@ -2,75 +2,65 @@
 
 #include <twist/stdlike/mutex.hpp>
 #include <twist/stdlike/condition_variable.hpp>
-#include <deque>
 
+#include <wheels/support/defer.hpp>
+#include <wheels/intrusive/forward_list.hpp>
+
+#include <deque>
 #include <optional>
 
 namespace exe::detail {
 
 // Unbounded blocking multi-producers/multi-consumers queue
 
-template <class Q>
-struct PopFrontWhenDie {
-  Q& object_;
-  explicit PopFrontWhenDie(Q& object) : object_(object) {
-  }
-  ~PopFrontWhenDie() {
-    object_.pop_front();
-  }
-};
-
 template <typename T>
-class UnboundedBlockingQueue {
-  using Mutex = twist::stdlike::mutex;
-  using CondVar = twist::stdlike::condition_variable;
+class UnboundedIntrusiveBlockingQueue {
+  using Node = wheels::IntrusiveForwardListNode<T>;
 
  public:
-  bool Put(T value) {
-    std::unique_lock lock(mutex_);
+  bool Put(T* value) {
+    std::lock_guard lock(mutex_);
     if (closed_) {
       return false;
     }
-    queue_.push_back(std::move(value));
+    queue_.PushBack(static_cast<Node*>(value));
     queue_access_.notify_one();
     return true;
   }
 
-  std::optional<T> Take() {
+  std::optional<T*> Take() {
     std::unique_lock lock(mutex_);
-    while ((!closed_) && queue_.empty()) {
+    while ((!closed_) && queue_.IsEmpty()) {
       queue_access_.wait(lock);
     }
-    if (closed_ && queue_.empty()) {
+    if (closed_ && queue_.IsEmpty()) {
       return std::nullopt;
     }
-    PopFrontWhenDie pop(queue_);
-    return {std::move(queue_.front())};
+
+    return queue_.PopFront();
   }
 
   void Close() {
-    CloseImpl(/*clear=*/false);
-  }
-
-  void Cancel() {
-    CloseImpl(/*clear=*/true);
-  }
-
- private:
-  void CloseImpl(bool clear) {
     std::unique_lock lock(mutex_);
     closed_ = true;
-    if (clear) {
-      queue_.clear();
+    queue_access_.notify_all();
+  }
+
+  template <typename FunctionT>
+  void Cancel(FunctionT func) {
+    std::unique_lock lock(mutex_);
+    closed_ = true;
+    while (!queue_.IsEmpty()) {
+      func(queue_.PopFront());
     }
     queue_access_.notify_all();
   }
 
  private:
   bool closed_ = false;
-  CondVar queue_access_;
-  Mutex mutex_;
-  std::deque<T> queue_;
+  twist::stdlike::condition_variable queue_access_;
+  twist::stdlike::mutex mutex_;
+  wheels::IntrusiveForwardList<T> queue_;
 };
 
 }  // namespace exe::detail

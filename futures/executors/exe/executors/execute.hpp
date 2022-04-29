@@ -13,7 +13,8 @@ namespace exe::executors {
 
 template <typename F>
 void Execute(IExecutor& where, F&& f) {
-  where.Execute(std::forward<F>(f));
+  where.Execute(HeapFunctionTask<std::remove_reference_t<F>>::CreateNew(
+      std::forward<F>(f)));
 }
 
 }  // namespace exe::executors

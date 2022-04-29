@@ -40,7 +40,7 @@ class ThreadPool : public IExecutor {
  private:
   exe::detail::ZeroWaiter waiter_;
   std::vector<twist::stdlike::thread> workers_;
-  exe::detail::UnboundedBlockingQueue<Task> tasks_;
+  exe::detail::UnboundedIntrusiveBlockingQueue<TaskBase> tasks_;
   bool is_stopped_{false};
 };
 

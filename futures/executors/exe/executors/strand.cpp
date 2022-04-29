@@ -4,11 +4,12 @@ namespace exe::executors {
 
 Strand::Strand(IExecutor& underlying) : slave_(underlying) {
 }
+
 void Strand::Execute(Task task) {
   auto created = new TaskNode{.task_ = std::move(task)};
   while (true) {
-    created->prev_.store(tasks_);
-    auto expected = created->prev_.load();
+    created->prev_ = tasks_;
+    auto expected = created->prev_;
     if (tasks_.compare_exchange_strong(expected, created)) {
       break;
     }
@@ -19,29 +20,34 @@ void Strand::Execute(Task task) {
 }
 
 void Strand::Schedule() {
-  slave_.Execute([this]() {
-    auto stolen = tasks_.exchange(nullptr);
+  slave_.Execute(static_cast<TaskBase*>(this));
+}
 
-    if (stolen == nullptr) {
-      reschedule_.store(true);
-      if (tasks_.load() == nullptr) {
-        return;
-      }
-      if (!reschedule_.exchange(false)) {
-        return;
-      }
-      Schedule();
+void Strand::Run() {
+  auto stolen = tasks_.exchange(nullptr);
+
+  if (stolen == nullptr) {
+    reschedule_.store(true);
+    if (tasks_.load() == nullptr) {
       return;
     }
-    stolen = stolen->Reverse();
-    while (stolen != nullptr) {
-      stolen->task_();
-      auto save = stolen->prev_.load();
-      delete stolen;
-      stolen = save;
+    if (!reschedule_.exchange(false)) {
+      return;
     }
     Schedule();
-  });
+    return;
+  }
+  stolen = stolen->Reverse();
+  while (stolen != nullptr) {
+    stolen->task_->Run();
+    stolen->task_->Discard();
+    auto save = stolen->prev_;
+    delete stolen;
+    stolen = save;
+  }
+  Schedule();
+}
+void Strand::Discard() noexcept {
 }
 
 Strand::TaskNode* Strand::TaskNode::Reverse() {
@@ -49,11 +55,12 @@ Strand::TaskNode* Strand::TaskNode::Reverse() {
   TaskNode* prev = this;
 
   while (prev != nullptr) {
-    TaskNode* save = prev->prev_.load();
-    prev->prev_.store(cur);
+    TaskNode* save = prev->prev_;
+    prev->prev_ = cur;
     cur = prev;
     prev = save;
   }
   return cur;
 }
+
 }  // namespace exe::executors

@@ -6,7 +6,8 @@ class InlineExecutor : public IExecutor {
  public:
   // IExecutor
   void Execute(Task task) override {
-    task();
+    task->Run();
+    task->Discard();
   }
 };
 
