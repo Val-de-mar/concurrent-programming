@@ -4,6 +4,7 @@
 #include <exe/fibers/sync/mutex.hpp>
 
 #include <twist/stdlike/atomic.hpp>
+#include <twist/util/spin_wait.hpp>
 
 #include <wheels/support/defer.hpp>
 
@@ -43,7 +44,7 @@ class WaitGroup {
     while (!is_done_) {
       done_wait_.ParkIfEqual(false);
     }
-    twist::thread::SpinWait wait;
+    twist::util::SpinWait wait;
     while (using_ != 0) {
       wait.Spin();
     }

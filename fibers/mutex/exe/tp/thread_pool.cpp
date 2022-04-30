@@ -6,7 +6,7 @@ namespace exe::tp {
 
 ////////////////////////////////////////////////////////////////////////////////
 
-static twist::util::ThreadLocalPtr<ThreadPool> this_pool;
+static twist::util::ThreadLocalPtr<ThreadPool> pool;
 
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -24,9 +24,10 @@ ThreadPool::~ThreadPool() {
 }
 
 void ThreadPool::Submit(Task task) {
-  ++waiter_;
-  if (!tasks_.Put(std::move(task))) {
-    --waiter_;
+  waiter_.IncrementValue();
+  if (!tasks_.Put(task)) {
+    task->Discard();
+    waiter_.DecrementValue();
   }
 }
 
@@ -35,7 +36,9 @@ void ThreadPool::WaitIdle() {
 }
 
 void ThreadPool::Stop() {
-  tasks_.Cancel();
+  tasks_.Cancel([](Task task) {
+    task->Discard();
+  });
   is_stopped_ = true;
   for (auto& worker : workers_) {
     worker.join();
@@ -43,19 +46,20 @@ void ThreadPool::Stop() {
 }
 
 ThreadPool* ThreadPool::Current() {
-  return this_pool;
+  return pool;
 }
 
 void ThreadPool::ThreadRoutine() {
-  tp::this_pool = this;
+  pool = this;
   while (auto task = tasks_.Take()) {
     try {
-      task.value()();
+      task.value()->Run();
     } catch (...) {
+      task.value()->Discard();
     }
-    --(waiter_);
+    waiter_.DecrementValue();
   }
-  tp::this_pool = nullptr;
+  pool = nullptr;
 }
 
 }  // namespace exe::tp

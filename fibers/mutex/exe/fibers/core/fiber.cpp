@@ -10,9 +10,7 @@ static twist::strand::ThreadLocalPtr<Fiber> current_fiber;
 //////////////////////////////////////////////////////////////////////
 
 void Fiber::Schedule() {
-  scheduler_.Submit([this]() {
-    Step();
-  });
+  scheduler_.Submit(this);
 }
 
 void Fiber::Yield() {
@@ -20,16 +18,20 @@ void Fiber::Yield() {
   SetAwaiter(&awaiter);
   Suspend();
 }
-void Fiber::Step() {
+void Fiber::Run() {
   current_fiber = this;
   awaiter_ = nullptr;
 
   coroutine_.Resume();
   if (awaiter_ != nullptr) {
-    awaiter_->AwaitSuspend();
+    awaiter_->AwaitSuspend(FiberHandle(this));
   } else {
     delete this;
   }
+}
+
+void Fiber::Discard() noexcept {
+  delete this;
 }
 
 Fiber& Fiber::Self() {
@@ -61,7 +63,6 @@ void Go(Scheduler& scheduler, Routine routine) {
   auto fiber = new Fiber(scheduler, std::move(routine));
   fiber->Schedule();
 }
-
 void Go(Routine routine) {
   Go(*tp::ThreadPool::Current(), std::move(routine));
 }

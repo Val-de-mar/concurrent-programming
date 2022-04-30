@@ -17,7 +17,4 @@ void FiberHandle::Schedule() {
   Release()->Schedule();
 }
 
-void FiberHandle::Resume() {
-}
-
 }  // namespace exe::fibers

@@ -24,9 +24,6 @@ class FiberHandle {
   // Schedule to an associated scheduler
   void Schedule();
 
-  // Resume immediately in the current thread
-  void Resume();
-
  private:
   explicit FiberHandle(Fiber* fiber) : fiber_(fiber) {
   }

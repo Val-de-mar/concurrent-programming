@@ -21,28 +21,20 @@ struct FutexAwaiter
   using Node = wheels::IntrusiveListNode<FutexAwaiter<FiberT, T>>;
   FutexAwaiter(FutexLike<T>* futex, T old_value)
       : futex_(futex),
-        fiber_(&Fiber::Self()),
+        handle_(FiberHandle::Invalid()),
         old_value_(std::move(old_value)) {
     //    std::cout << "made futex " << this << std::endl;
   }
 
-  virtual void AwaitSuspend();
+  void AwaitSuspend(FiberHandle handle) override;
   void Awake();
   FutexLike<T>* futex_;
-  Fiber* fiber_;
+  FiberHandle handle_;
   T old_value_;
   virtual ~FutexAwaiter() {
     this->Unlink();
     //    std::cout << "destroyed futex" << this << std::endl;
   }
-};
-
-template <typename FiberT, typename T>
-struct FutexWakerAwaiter : public IAwaiter<FiberT> {
-  virtual void AwaitSuspend();
-  FutexLike<T>* futex_;
-  Fiber* fiber_;
-  T old_value_;
 };
 
 template <typename T>
@@ -73,7 +65,7 @@ class FutexLike {
     //    std::cerr << "taken\n";
     if (!queue_.IsEmpty()) {
       auto node = queue_.PopFront();
-      assert(node->fiber_ != &Fiber::Self());
+      //      assert(node->fiber_ != &Fiber::Self());
       node->Awake();
     }
   }
@@ -97,13 +89,13 @@ class FutexLike {
 };
 
 template <typename FiberT, typename T>
-void FutexAwaiter<FiberT, T>::AwaitSuspend() {
+void FutexAwaiter<FiberT, T>::AwaitSuspend(FiberHandle handle) {
+  handle_ = handle;
   std::unique_lock guard(futex_->lock_);
   futex_->queue_.PushBack(this);
   if (futex_->cell_.load() != old_value_) {
     this->Unlink();
-    fiber_->Schedule();
-  } else {
+    handle.Schedule();
   }
 }
 
@@ -111,7 +103,7 @@ template <typename FiberT, typename T>
 void FutexAwaiter<FiberT, T>::Awake() {
   // std::cerr << "awaken " << futex_ << "\n";
   this->Unlink();
-  fiber_->Schedule();
+  handle_.Schedule();
 }
 
 }  // namespace exe::fibers

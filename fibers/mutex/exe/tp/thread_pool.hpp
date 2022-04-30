@@ -38,11 +38,10 @@ class ThreadPool {
   void ThreadRoutine();
 
  private:
-  ZeroWaiter waiter_;
+  detail::ZeroWaiter waiter_;
   std::vector<twist::stdlike::thread> workers_;
-  UnboundedBlockingQueue<Task> tasks_;
+  detail::UnboundedIntrusiveBlockingQueue<TaskBase> tasks_;
   bool is_stopped_{false};
-  // Worker threads, task queue, etc
 };
 
 }  // namespace exe::tp

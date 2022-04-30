@@ -8,7 +8,7 @@ namespace exe::fibers {
 
 // Fiber = Stackful coroutine + Scheduler (Thread pool)
 
-class Fiber {
+class Fiber : public tp::TaskBase {
  public:
   // ~ System calls
   void Schedule();
@@ -16,14 +16,15 @@ class Fiber {
   void Suspend();
   void SetAwaiter(IAwaiter<Fiber>*);
 
+  void Run() override;
+  void Discard() noexcept override;
+
   static Fiber& Self();
 
-  ~Fiber();
+  ~Fiber() override;
 
  private:
   Fiber(Scheduler& scheduler, Routine routine);
-  // Task
-  void Step();
 
  private:
   Scheduler& scheduler_;

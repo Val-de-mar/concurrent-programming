@@ -1,14 +1,10 @@
-//
-// Created by val-de-mar on 09.03.2022.
-//
-
 #include <exe/tp/zero_waiter.hpp>
 
 #include <cassert>
 
-namespace exe::tp {
+namespace exe::detail {
 
-ZeroWaiter& ZeroWaiter::operator--() {
+ZeroWaiter& ZeroWaiter::DecrementValue() {
   std::unique_lock lock(mutex_);
   assert(counter_ != 0);
   --counter_;
@@ -17,7 +13,7 @@ ZeroWaiter& ZeroWaiter::operator--() {
   }
   return *this;
 }
-ZeroWaiter& ZeroWaiter::operator++() {
+ZeroWaiter& ZeroWaiter::IncrementValue() {
   std::unique_lock lock(mutex_);
   ++counter_;
   return *this;
@@ -28,4 +24,4 @@ void ZeroWaiter::Wait() {
     is_null_.wait(lock);
   }
 }
-}  // namespace exe::tp
+}  // namespace exe::detail

@@ -7,14 +7,14 @@ namespace exe::fibers {
 template <typename FiberT>
 struct IAwaiter {
   // Your AwaitSuspend goes here
-  virtual void AwaitSuspend() = 0;
+  virtual void AwaitSuspend(FiberHandle handle) = 0;
   virtual ~IAwaiter() = default;
 };
 
 template <typename FiberT>
 struct YieldAwaiter : public IAwaiter<FiberT> {
-  virtual void AwaitSuspend() {
-    FiberT::Self().Schedule();
+  void AwaitSuspend(FiberHandle handle) override {
+    handle.Schedule();
   }
 };
 
