@@ -1,0 +1,39 @@
+#pragma once
+
+#include <exe/executors/executor.hpp>
+
+namespace exe::fibers {
+
+class Fiber;
+
+// Lightweight non-owning handle to a _suspended_ fiber object
+
+class FiberHandle {
+  friend class Fiber;
+
+ public:
+  FiberHandle() : FiberHandle(nullptr) {
+  }
+
+  static FiberHandle Invalid() {
+    return FiberHandle(nullptr);
+  }
+
+  bool IsValid() const {
+    return fiber_ != nullptr;
+  }
+
+  // Schedule to an associated scheduler
+  void Schedule(executors::Hint hint = executors::Hint::UpToYou);
+
+ private:
+  explicit FiberHandle(Fiber* fiber) : fiber_(fiber) {
+  }
+
+  Fiber* Release();
+
+ private:
+  Fiber* fiber_;
+};
+
+}  // namespace exe::fibers
