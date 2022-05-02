@@ -95,8 +95,7 @@ class GlobalQueue {
     std::unique_lock lock(access_);
     while (queue_.empty() && !is_closed_.load() && !helper_request_.load()) {
       waiter_.DecrementValue();
-      //      std::cout << "sleep" +
-      //      std::to_string(int(std::this_thread::get_id())) + "\n";
+
       sleeper_.wait(lock);
       waiter_.IncrementValue();
       //      std::cout << "awake" + std::to_string(index) + "\n";
