@@ -37,6 +37,7 @@ void Strand::Run() {
     Schedule();
     return;
   }
+
   stolen = stolen->Reverse();
   while (stolen != nullptr) {
     stolen->task_->Run();
@@ -44,6 +45,7 @@ void Strand::Run() {
     delete stolen;
     stolen = save;
   }
+
   Schedule();
 }
 void Strand::Discard() noexcept {
