@@ -29,13 +29,9 @@ class GlobalQueue {
       waiter_.IncrementValue();
     }
     queue_.push_back(item);
-    //    std::cout << "push "  + std::to_string(ttt.fetch_add(1)) +" "+
-    //    std::to_string(queue_.size()) + "\n";
-    sleeper_.notify_one();
   }
 
   void Offload(std::span<TaskBase*> buffer) {
-    //    std::cout << "offloaded " + std::to_string(buffer.size()) + "\n";
     if (is_closed_) {
       for (auto item : buffer) {
         item->Discard();
@@ -49,13 +45,11 @@ class GlobalQueue {
     for (auto task : buffer) {
       queue_.push_back(task);
     }
-    sleeper_.notify_all();
   }
 
   // Returns nullptr if queue is empty
   TaskBase* TryPopOne() {
     std::lock_guard lock(access_);
-    //    std::cout << "pop\n";
     if (queue_.empty()) {
       return nullptr;
     }
@@ -79,8 +73,6 @@ class GlobalQueue {
       return 0;
     }
 
-    //    std::cout << std::to_string(limit) + "\n" << std::endl;
-
     if (limit == queue_.size()) {
       waiter_.DecrementValue();
     }
@@ -91,33 +83,12 @@ class GlobalQueue {
     return limit;
   }
 
-  void TryParkMe() {
-    std::unique_lock lock(access_);
-    while (queue_.empty() && !is_closed_.load() && !helper_request_.load()) {
-      waiter_.DecrementValue();
-
-      sleeper_.wait(lock);
-      waiter_.IncrementValue();
-      //      std::cout << "awake" + std::to_string(index) + "\n";
-    }
-    helper_request_.store(false);
-  }
-
-  void WakeOne() {
-    helper_request_.store(true);
-    sleeper_.notify_one();
-  }
-
   void WaitIdle() {
     waiter_.Wait();
   }
   void Stop() {
     //    std::cout << "рота подъем\n";
     is_closed_.store(true);
-    {
-      std::unique_lock lock(access_);
-      sleeper_.notify_all();
-    }
     std::array<TaskBase*, 256> buf;
     while (true) {
       size_t i = 0;
@@ -137,15 +108,18 @@ class GlobalQueue {
     }
   }
 
-  explicit GlobalQueue(size_t workers) : access_(), queue_(), waiter_(workers) {
+  size_t Size() {
+    std::lock_guard lock(access_);
+    return queue_.size();
+  }
+
+  explicit GlobalQueue(size_t) : access_(), queue_(), waiter_(0) {
   }
 
  private:
   twist::stdlike::mutex access_;
   std::deque<TaskBase*> queue_;
   twist::stdlike::atomic<bool> is_closed_{false};
-  twist::stdlike::atomic<bool> helper_request_{false};
-  twist::stdlike::condition_variable sleeper_;
   support::ZeroWaiter waiter_;
 };
 

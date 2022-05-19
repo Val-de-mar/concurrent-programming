@@ -9,6 +9,8 @@
 #include <twist/stdlike/thread.hpp>
 #include <twist/stdlike/random.hpp>
 
+#include <wheels/intrusive/list.hpp>
+
 #include <cstdlib>
 #include <optional>
 #include <random>
@@ -18,11 +20,16 @@ namespace exe::executors::tp::fast {
 
 class ThreadPool;
 
-class Worker {
+class Worker : public wheels::IntrusiveListNode<Worker> {
  private:
   static const size_t kLocalQueueCapacity = 256;
 
  public:
+  enum Stealing {
+    Active,
+    Passive,
+  };
+
   Worker(ThreadPool& host, size_t index);
 
   void Start();
@@ -35,8 +42,8 @@ class Worker {
   // Steal from this worker
   size_t StealTasks(std::span<TaskBase*> out_buffer);
 
-  // Wake parked worker
-  void Wake();
+  void MakeActive();
+  void MakePassive();
 
   static Worker* Current();
 
@@ -58,7 +65,6 @@ class Worker {
   TaskBase* TryStealTasks(size_t series);
   TaskBase* GrabTasksFromGlobalQueue();
   TaskBase* TryPickNextTask();
-  TaskBase* TryPickTaskBeforePark();
 
   // Blocking
   TaskBase* PickNextTask();
@@ -68,7 +74,7 @@ class Worker {
 
  private:
   ThreadPool& host_;
-  const size_t index_;
+  //  const size_t index_;
 
   // Worker thread
   std::optional<twist::stdlike::thread> thread_;
@@ -78,6 +84,7 @@ class Worker {
 
   // For work stealing
   std::mt19937_64 twister_{twist::stdlike::random_device()()};
+  twist::stdlike::atomic<Stealing> impudence_;
   size_t cycle_{0};
 
   // LIFO slot
@@ -87,9 +94,9 @@ class Worker {
 
   // Parking lot
   twist::stdlike::atomic<uint32_t> wakeups_{0};
-
   twist::stdlike::atomic<bool> stopped_{false};
 
+ public:
   WorkerMetrics metrics_;
 };
 

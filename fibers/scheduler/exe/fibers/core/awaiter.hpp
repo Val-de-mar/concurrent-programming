@@ -14,7 +14,7 @@ struct IAwaiter {
 template <typename FiberT>
 struct YieldAwaiter : public IAwaiter<FiberT> {
   void AwaitSuspend(FiberHandle handle) override {
-    handle.Schedule();
+    handle.Schedule(executors::Hint::Slow);
   }
 };
 

@@ -6,7 +6,6 @@
 #include <exe/executors/tp/fast/worker.hpp>
 #include <exe/executors/tp/fast/coordinator.hpp>
 #include <exe/executors/tp/fast/metrics.hpp>
-#include <exe/support/box.hpp>
 
 // random_device
 #include <twist/stdlike/random.hpp>
@@ -43,14 +42,10 @@ class ThreadPool : public IExecutor {
   static ThreadPool* Current();
 
  private:
-  size_t GrabFromGlobal(std::span<TaskBase*> out_buffer);
-
- private:
-  Box<Worker> workers_;
+  std::deque<Worker> workers_;
   Coordinator coordinator_;
   GlobalQueue global_tasks_;
   twist::stdlike::atomic<size_t> size_;
-  // ???
 };
 
 }  // namespace exe::executors::tp::fast

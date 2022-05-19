@@ -7,13 +7,14 @@ namespace exe::executors::tp::fast {
 
 twist::util::ThreadLocalPtr<Worker> current_worker;
 
-Worker::Worker(ThreadPool& host, size_t index) : host_(host), index_(index) {
+Worker::Worker(ThreadPool& host, size_t index)
+    : host_(host) /*, index_(index)*/, impudence_(Active), metrics_(index) {
+  host_.coordinator_.AcquireUnsafe(*this);
 }
 
 void Worker::Start() {
   thread_.emplace([this]() {
     Work();
-    //    std::cout << "out "  + std::to_string(index_) + "\n";
   });
 }
 
@@ -22,13 +23,12 @@ void Worker::Join() {
 }
 
 void Worker::PushToLocalQueue(TaskBase* task) {
-  //  std::cout << "pushed\n";
   if (stopped_.load()) {
     task->Discard();
+    ++metrics_.discarded_;
     return;
   }
   if (!local_tasks_.TryPush(task)) {
-    //    std::cout << "offload\n";
     OffloadTasksToGlobalQueue(task);
   }
 }
@@ -36,6 +36,7 @@ void Worker::PushToLocalQueue(TaskBase* task) {
 void Worker::PushToLifoSlot(TaskBase* task) {
   if (stopped_.load()) {
     task->Discard();
+    ++metrics_.discarded_;
     return;
   }
   if (lifo_slot_ == nullptr) {
@@ -56,11 +57,11 @@ TaskBase* Worker::PickNextTask() {
     ++cycle_;
     if (cycle_ >= 10) {
       cycle_ = 0;
-      host_.global_tasks_.WakeOne();
+      host_.coordinator_.AwakeOne();
     }
-    //    std::cout << "roll\n";
     if (lifo_usage_ < kLifoLimit && lifo_slot_ != nullptr) {
       ++lifo_usage_;
+      ++metrics_.from_lifo_;
       return std::exchange(lifo_slot_, nullptr);
     }
     lifo_usage_ = 0;
@@ -68,36 +69,33 @@ TaskBase* Worker::PickNextTask() {
     TaskBase* ans;
     ans = TryPickNextTask();
     if (ans != nullptr) {
-      //            std::cout << std::to_string(index_) + " taken next, local: "
-      //            + std::to_string(local_tasks_.LowSize()) + "\n";
       return ans;
     } else {
-      //      std::cout << std::to_string(index_) + " cant get local " +
-      //      std::to_string(local_tasks_.LowSize()) + "\n";
+      ans = GrabTasksFromGlobalQueue();
     }
-    ans = GrabTasksFromGlobalQueue();
     if (ans != nullptr) {
-      //            std::cout << std::to_string(index_) + " taken global local:
-      //            " + std::to_string(local_tasks_.LowSize()) + "\n";
       return ans;
     }
 
-    if ((ans = TryStealTasks(1)) != nullptr) {
-      //      std::cout << "stolen\n";
-      //      std::cout << std::to_string(index_) + " taken stolen\n";
-      return ans;
+    if (impudence_ == Active) {
+      if ((ans = TryStealTasks((host_.workers_.size() + 1) / 2)) != nullptr) {
+        return ans;
+      }
     }
 
     if (lifo_slot_ != nullptr) {
       continue;
     }
-    host_.global_tasks_.TryParkMe();
+    host_.coordinator_.TryParkMe(*this);
   }
+  host_.coordinator_.Release(*this);
   if (lifo_slot_ != nullptr) {
     lifo_slot_->Discard();
+    ++metrics_.discarded_;
   }
   while (TaskBase* ans = TryPickNextTask()) {
     ans->Discard();
+    ++metrics_.discarded_;
   }
   return nullptr;
 }
@@ -109,12 +107,12 @@ void Worker::Work() {
     try {
       next->Run();
       valll.fetch_add(1);
+      ++metrics_.executed_;
     } catch (...) {
       next->Discard();
+      ++metrics_.discarded_;
     }
     current_worker = nullptr;
-    //    std::cout << "executed " + std::to_string(valll.load()) + " by " +
-    //    std::to_string(index_) + "\n";
   }
 }
 
@@ -126,12 +124,14 @@ TaskBase* Worker::GrabTasksFromGlobalQueue() {
   std::array<TaskBase*, Worker::kLocalQueueCapacity / 2> buffer;
   auto grabbed = host_.global_tasks_.Grab(buffer, host_.Size() /*, index_*/);
   if (grabbed == 0) {
-    return nullptr;
+    host_.coordinator_.AllowParking();
+
+    grabbed = host_.global_tasks_.Grab(buffer, host_.Size() /*, index_*/);
+    if (grabbed == 0) {
+      return nullptr;
+    }
   }
-  //  for (size_t i = 0; i < grabbed; ++i) {
-  //    std::cout << "push buffer " + std::to_string(uint64_t(buffer[i])) +
-  //    "\n";
-  //  }
+  metrics_.grabbed_from_global_ += grabbed;
   if (grabbed != 1) {
     local_tasks_.PushMany(std::span(buffer).subspan(1, grabbed - 1));
   }
@@ -141,29 +141,26 @@ TaskBase* Worker::GrabTasksFromGlobalQueue() {
 TaskBase* Worker::TryStealTasks(size_t series) {
   std::array<TaskBase*, kLocalQueueCapacity> buffer;
   for (size_t i = 0; i < series; ++i) {
-    for (Worker& victim : host_.workers_) {
-      if (&victim == this) {
-        continue;
-      }
-      auto stolen = victim.StealTasks(buffer);
-      //      std::cout << "stolen from " + std::to_string(victim.index_) +
-      //      std::to_string(stolen) + "\n";
-      if (stolen == 0) {
-        continue;
-      }
-      if (stolen != 1) {
-        local_tasks_.PushMany(std::span(buffer).subspan(1, stolen - 1));
-      }
-      return buffer[0];
+    Worker& victim = host_.coordinator_.GiveVictim(twister_());
+    if (&victim == this) {
+      continue;
     }
+    auto stolen = victim.StealTasks(buffer);
+    if (stolen == 0) {
+      continue;
+    }
+    metrics_.stolen_ += stolen;
+    if (stolen != 1) {
+      local_tasks_.PushMany(std::span(buffer).subspan(1, stolen - 1));
+    }
+    return buffer[0];
   }
+
   return nullptr;
 }
 
 size_t Worker::StealTasks(std::span<TaskBase*> out_buffer) {
   auto limit = std::min(local_tasks_.LowSize() / 2, out_buffer.size());
-  //  std::cout <<  std::to_string(out_buffer.size()) + "limit " +
-  //  std::to_string(limit) + "\n";
   return local_tasks_.Grab(out_buffer.subspan(0, limit));
 }
 Worker* Worker::Current() {
@@ -174,7 +171,15 @@ void Worker::OffloadTasksToGlobalQueue(TaskBase* overflow) {
   buffer[0] = overflow;
   auto grabbed = local_tasks_.Grab(std::span(buffer).subspan(1));
   ++grabbed;
+  metrics_.offloaded_ += grabbed;
   host_.global_tasks_.Offload(std::span(buffer).subspan(grabbed));
+  host_.coordinator_.AwakeOne();
+}
+void Worker::MakeActive() {
+  impudence_.store(Active);
+}
+void Worker::MakePassive() {
+  impudence_.store(Passive);
 }
 
 ThreadPool* ThreadPool::Current() {
