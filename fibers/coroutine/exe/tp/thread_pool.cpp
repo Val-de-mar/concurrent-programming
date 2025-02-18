@@ -1,9 +1,8 @@
-#include <tp/thread_pool.hpp>
+#include <exe/tp/thread_pool.hpp>
 
 #include <twist/util/thread_local.hpp>
-#include <wheels/support/defer.hpp>
 
-namespace tp {
+namespace exe::tp {
 
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -49,9 +48,6 @@ ThreadPool* ThreadPool::Current() {
 
 void ThreadPool::ThreadRoutine() {
   tp::this_pool = this;
-  wheels::Defer unmount([]() {
-    tp::this_pool = nullptr;
-  });
   while (auto task = tasks_.Take()) {
     try {
       task.value()();
@@ -59,6 +55,7 @@ void ThreadPool::ThreadRoutine() {
     }
     --(waiter_);
   }
+  tp::this_pool = nullptr;
 }
 
-}  // namespace tp
+}  // namespace exe::tp
