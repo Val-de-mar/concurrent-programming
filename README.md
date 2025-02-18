@@ -1,7 +1,7 @@
 # Solutions
 # Concurrency Course Solutions
 
-This repository contains my solutions to the assignments from the [Concurrency Course](https://gitlab.com/Lipovsky/concurrency-course). It includes implementations of various concurrency abstractions such as mutexes, condition variables, semaphores, futures, thread pools, fibers, and lock-free data structures.
+This repository contains my solutions to the assignments from the [Concurrency Course](https://gitlab.com/Lipovsky/concurrency-course) migrated from [gitlab](https://gitlab.com) repository. It includes implementations of various concurrency abstractions such as mutexes, condition variables, semaphores, futures, thread pools, fibers, and lock-free data structures.
 
 ## Libraries
 
